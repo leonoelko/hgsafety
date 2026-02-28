@@ -14,6 +14,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root {
     --bg: #f5f3ef;
@@ -174,6 +175,11 @@
   .btn.pdf { border-color: #c0392b; color: #c0392b; }
   .btn.pdf:hover { background: #fdf2f0; border-color: #c0392b; color: #c0392b; }
   .btn.pdf:disabled { opacity: 0.6; cursor: wait; }
+  .btn.excel-export { border-color: #2a7a4f; color: #2a7a4f; }
+  .btn.excel-export:hover { background: #f0f9f4; border-color: #2a7a4f; color: #2a7a4f; }
+  .btn.excel-import { border-color: #7a3a8a; color: #7a3a8a; }
+  .btn.excel-import:hover { background: #f8f0fa; border-color: #7a3a8a; color: #7a3a8a; }
+  #xlsxFileInput { display: none; }
 
   .btn {
     padding: 9px 14px; border-radius: 8px; border: 1px solid var(--border);
@@ -527,6 +533,9 @@
         <input type="text" id="searchInput" placeholder="항목 검색..." oninput="renderAll()">
       </div>
       <button class="filter-btn" id="filterBtn" onclick="toggleFilter()">미완료만</button>
+      <button class="btn excel-export sm" onclick="exportExcel()" title="엑셀로 내보내기">📥 Excel 다운</button>
+      <button class="btn excel-import sm" onclick="document.getElementById('xlsxFileInput').click()" title="엑셀에서 가져오기">📤 Excel 업로드</button>
+      <input type="file" id="xlsxFileInput" accept=".xlsx,.xls" onchange="importExcel(event)">
       <button class="btn ghost sm" onclick="showResetConfirm()" title="초기화">↺</button>
     </div>
 
@@ -1082,6 +1091,106 @@ function pdfItemHTML(item) {
         ${item.note ? `<div style="font-size:10px;color:#666;font-style:italic;margin-top:2px;">💬 ${esc(item.note)}</div>` : ''}
       </div>
     </div>`;
+}
+
+// ───── Excel 내보내기 ─────
+function exportExcel() {
+  const wb = XLSX.utils.book_new();
+
+  // 시트1: 항목 목록
+  const priLabel = { high: '위험', mid: '주의', low: '참고' };
+  const itemRows = [['카테고리ID', '카테고리명', '항목내용', '우선순위', '비고', '완료여부']];
+  state.items.forEach(item => {
+    const cat = state.categories.find(c => c.id === item.catId);
+    itemRows.push([
+      item.catId,
+      cat ? cat.name : '',
+      item.text,
+      priLabel[item.priority] || item.priority,
+      item.note || '',
+      item.checked ? 'Y' : 'N'
+    ]);
+  });
+  const ws1 = XLSX.utils.aoa_to_sheet(itemRows);
+  ws1['!cols'] = [
+    { wch: 14 }, { wch: 16 }, { wch: 50 }, { wch: 10 }, { wch: 24 }, { wch: 8 }
+  ];
+  XLSX.utils.book_append_sheet(wb, ws1, '안전수칙 항목');
+
+  // 시트2: 카테고리 목록
+  const catRows = [['카테고리ID', '카테고리명', '아이콘', '색상']];
+  state.categories.forEach(c => catRows.push([c.id, c.name, c.icon, c.color]));
+  const ws2 = XLSX.utils.aoa_to_sheet(catRows);
+  ws2['!cols'] = [{ wch: 14 }, { wch: 18 }, { wch: 8 }, { wch: 12 }];
+  XLSX.utils.book_append_sheet(wb, ws2, '카테고리');
+
+  const today = new Date();
+  const dateStr = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
+  XLSX.writeFile(wb, `항구현장안전수칙_${dateStr}.xlsx`);
+  showToast('📥 Excel 파일이 다운로드되었습니다');
+}
+
+// ───── Excel 가져오기 ─────
+function importExcel(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+
+      // 카테고리 시트 읽기 (있을 경우)
+      const catSheet = wb.Sheets['카테고리'];
+      if (catSheet) {
+        const catRows = XLSX.utils.sheet_to_json(catSheet, { header: 1 });
+        const newCats = [];
+        for (let i = 1; i < catRows.length; i++) {
+          const [id, name, icon, color] = catRows[i];
+          if (id && name) newCats.push({ id: String(id), name: String(name), icon: icon || '📋', color: color || '#d4581a' });
+        }
+        if (newCats.length > 0) state.categories = newCats;
+      }
+
+      // 항목 시트 읽기
+      const itemSheet = wb.Sheets['안전수칙 항목'];
+      if (!itemSheet) { showToast('⚠️ "안전수칙 항목" 시트를 찾을 수 없습니다'); return; }
+
+      const rows = XLSX.utils.sheet_to_json(itemSheet, { header: 1 });
+      const priMap = { '위험': 'high', '주의': 'mid', '참고': 'low', 'high': 'high', 'mid': 'mid', 'low': 'low' };
+      const newItems = [];
+      let newId = 1000;
+
+      for (let i = 1; i < rows.length; i++) {
+        const [catId, , text, priority, note, checked] = rows[i];
+        if (!text) continue;
+        newItems.push({
+          id: newId++,
+          catId: String(catId || state.categories[0]?.id || 'ppe'),
+          text: String(text),
+          priority: priMap[String(priority)] || 'mid',
+          note: note ? String(note) : '',
+          checked: String(checked).toUpperCase() === 'Y'
+        });
+      }
+
+      if (newItems.length === 0) { showToast('⚠️ 가져올 항목이 없습니다'); return; }
+
+      if (!confirm(`총 ${newItems.length}개 항목을 가져옵니다. 기존 항목은 모두 교체됩니다. 계속할까요?`)) return;
+
+      state.items = newItems;
+      save();
+      activeTab = 'all';
+      renderAll();
+      showToast(`✅ ${newItems.length}개 항목을 성공적으로 가져왔습니다`);
+    } catch(err) {
+      showToast('⚠️ 파일을 읽는 중 오류가 발생했습니다');
+      console.error(err);
+    }
+    // 파일 입력 초기화 (같은 파일 재업로드 가능하게)
+    event.target.value = '';
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 init();
