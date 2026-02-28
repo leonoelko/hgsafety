@@ -373,83 +373,134 @@
   .confirm-bar span { flex: 1; }
 
   @media (max-width: 700px) {
-    /* 상단 바 */
+    /* ── 상단 바 ── */
     .topbar { padding: 0 14px; gap: 8px; height: 48px; }
-    .topbar-icon { width: 28px; height: 28px; font-size: 16px; flex-shrink: 0; }
-    .topbar h1 { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
+    .topbar-icon { width: 26px; height: 26px; font-size: 14px; flex-shrink: 0; border-radius: 5px; }
+    .topbar h1 { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
     .topbar p { display: none; }
-    .topbar-date { font-size: 10px; }
+    .topbar-date { font-size: 10px; white-space: nowrap; }
 
-    /* 레이아웃: 세로 배치 */
+    /* ── 레이아웃 ── */
     .layout { grid-template-columns: 1fr; min-height: unset; }
 
-    /* 사이드바 → 가로 스크롤 탭 */
+    /* ── 사이드바 → 가로 스크롤 탭 바 ── */
     .sidebar {
       position: sticky;
       top: 48px;
       z-index: 90;
-      height: auto;
-      padding: 8px 12px;
-      display: flex;
-      flex-direction: row;
+      height: auto !important;
+      padding: 8px 10px;
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center;
       gap: 6px;
       overflow-x: auto;
-      overflow-y: hidden;
-      flex-wrap: nowrap;
+      overflow-y: visible;
+      flex-wrap: nowrap !important;
       scrollbar-width: none;
       -webkit-overflow-scrolling: touch;
       border-bottom: 1px solid #2a2520;
     }
     .sidebar::-webkit-scrollbar { display: none; }
-    .sidebar-section { margin: 0; display: contents; }
-    .sidebar-label { display: none; }
-    .sidebar-progress { display: none; }
-    .sidebar-add-cat { flex-shrink: 0; padding: 6px 10px; font-size: 11px; border-radius: 20px; height: 36px; align-items: center; }
 
-    /* 탭 아이템 */
-    .cat-nav-item {
-      flex-direction: row;
-      align-items: center;
-      padding: 5px 10px;
-      border-radius: 20px;
-      flex-shrink: 0;
+    /* 섹션 컨테이너 제거 */
+    .sidebar-section { display: contents !important; margin: 0; }
+    .sidebar-label { display: none !important; }
+    .sidebar-progress { display: none !important; }
+
+    /* catNav 자체를 flex row로 */
+    #catNav {
+      display: flex !important;
+      flex-direction: row !important;
       gap: 6px;
-      height: 36px;
-      margin-bottom: 0;
+      flex-wrap: nowrap;
+      align-items: center;
     }
-    .cat-nav-icon { width: 22px; height: 22px; font-size: 13px; border-radius: 50%; }
-    .cat-nav-name { font-size: 11px; white-space: nowrap; }
-    .cat-nav-sub { display: none; }
-    .cat-mini-bar { display: none; }
 
-    /* 메인 영역 */
+    /* 카테고리 탭 아이템 → 알약 모양 */
+    .cat-nav-item {
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      padding: 5px 12px !important;
+      border-radius: 20px !important;
+      flex-shrink: 0 !important;
+      gap: 5px !important;
+      height: 34px !important;
+      margin-bottom: 0 !important;
+      border: 1px solid transparent !important;
+      white-space: nowrap;
+      min-width: fit-content;
+    }
+    .cat-nav-item:hover { background: #252218 !important; }
+    .cat-nav-item.active { background: var(--accent) !important; }
+
+    .cat-nav-icon {
+      width: 20px !important; height: 20px !important;
+      font-size: 12px !important; border-radius: 50% !important;
+      flex-shrink: 0 !important;
+    }
+    .cat-nav-name { font-size: 11px !important; white-space: nowrap !important; }
+    .cat-nav-sub { display: none !important; }
+    .cat-nav-info { min-width: 0; }
+    .cat-mini-bar { display: none !important; }
+
+    /* 카테고리 추가 버튼 */
+    .sidebar-add-cat {
+      flex-shrink: 0 !important;
+      padding: 5px 10px !important;
+      font-size: 11px !important;
+      border-radius: 20px !important;
+      height: 34px !important;
+      display: flex !important;
+      align-items: center !important;
+      white-space: nowrap;
+    }
+
+    /* ── 메인 영역 ── */
     .main { padding: 14px 12px; max-width: 100%; }
 
-    /* 헤더 */
-    .main-header { flex-direction: column; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
-    .main-title-wrap h2 { font-size: 17px; }
+    /* 헤더: 제목 + 버튼 분리 */
+    .main-header { flex-direction: column; align-items: flex-start; gap: 8px; margin-bottom: 12px; }
+    .main-title-wrap h2 { font-size: 18px; }
     .main-title-wrap p { font-size: 12px; }
-    .main-actions { width: 100%; display: flex; gap: 6px; flex-wrap: wrap; }
-    .main-actions .btn { font-size: 11px; padding: 7px 10px; flex: 1; justify-content: center; min-width: 0; }
+    .cat-progress-bar { margin-top: 6px; }
 
-    /* 툴바 */
+    /* 버튼 2x2 그리드 */
+    .main-actions {
+      width: 100%;
+      display: grid !important;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .main-actions .btn {
+      font-size: 11px !important;
+      padding: 8px 6px !important;
+      justify-content: center !important;
+      min-width: 0 !important;
+    }
+
+    /* ── 툴바 ── */
     .toolbar { flex-wrap: wrap; gap: 6px; }
     .search-wrap { width: 100%; flex: unset; order: -1; }
     .filter-btn { font-size: 11px; padding: 7px 10px; }
-    .btn.excel-export, .btn.excel-import { font-size: 11px; padding: 7px 10px; }
-    .btn.ghost.sm { font-size: 13px; padding: 7px 10px; }
+    .btn.excel-export, .btn.excel-import { font-size: 11px !important; padding: 7px 10px !important; }
+    .btn.ghost.sm { padding: 7px 10px; }
 
-    /* 체크 항목 */
-    .check-item { padding: 10px 10px; }
-    .item-text { font-size: 12px; }
+    /* ── 체크 항목 ── */
+    .check-item { padding: 10px; }
+    .item-text { font-size: 13px; }
     .item-note { font-size: 11px; }
-    .badge { font-size: 9px; }
-    .icon-btn { width: 28px; height: 28px; }
+    .badge { font-size: 9px; padding: 2px 6px; }
+    .icon-btn { width: 30px; height: 30px; font-size: 14px; }
 
-    /* 폼 */
+    /* ── 항목 추가 폼 ── */
     .form-row { flex-direction: column; }
     .form-input { width: 100% !important; flex: unset !important; }
     .add-form { padding: 12px; }
+
+    /* ── 모달 ── */
+    .modal { width: calc(100vw - 32px); padding: 20px; }
   }
 
   /* 인쇄 전용 요소 — 화면에선 숨김 */
