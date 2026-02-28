@@ -15,6 +15,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <style>
   :root {
     --bg: #f5f3ef;
@@ -587,7 +589,8 @@
   <div class="topbar-icon">⚙️</div>
   <h1 onclick="setTab('all')" style="cursor:pointer;">항구 현장 안전수칙</h1>
   <p>MANUFACTURING SAFETY</p>
-  <div class="topbar-right">
+  <div class="topbar-right" style="display:flex;align-items:center;gap:8px;">
+    <span title="서버 연결 상태" id="connDot" style="width:8px;height:8px;border-radius:50%;background:#c0392b;display:inline-block;flex-shrink:0;transition:background 0.3s;"></span>
     <span class="topbar-date" id="todayDate"></span>
   </div>
 </div>
@@ -740,6 +743,19 @@
 <script>
 const STORAGE_KEY = 'mfg_safety_v3';
 
+// ───── Firebase 설정 ─────
+const firebaseConfig = {
+  apiKey: "AIzaSyD4ggneEIpHR2wq9qv-bd4Ujf2YqqZMaU8",
+  authDomain: "hgsafety-51f35.firebaseapp.com",
+  databaseURL: "https://hgsafety-51f35-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "hgsafety-51f35",
+  storageBucket: "hgsafety-51f35.firebasestorage.app",
+  messagingSenderId: "287466300796",
+  appId: "1:287466300796:web:9a42a1a490af8a5df9b0f9"
+};
+firebase.initializeApp(firebaseConfig);
+const dbRef = firebase.database().ref('checklist');
+
 const defaultCategories = [
   { id: 'ppe',     name: '보호구 착용',      icon: '🦺', color: '#d4581a' },
   { id: 'machine', name: '기계/설비 안전',   icon: '⚙️', color: '#1a5a8a' },
@@ -810,7 +826,13 @@ function loadState() {
   return { categories: JSON.parse(JSON.stringify(defaultCategories)), items: JSON.parse(JSON.stringify(defaultItems)) };
 }
 
-function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+function save() {
+  // 로컬 캐시 저장
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  // Firebase 실시간 동기화
+  dbRef.set({ categories: state.categories, items: state.items })
+    .catch(err => console.error('Firebase 저장 오류:', err));
+}
 
 function init() {
   const d = new Date();
@@ -818,7 +840,39 @@ function init() {
 
   refreshEmojiPicker();
   refreshColorPicker();
-  renderAll();
+
+  // 로딩 표시
+  document.getElementById('checklistArea').innerHTML = `
+    <div class="empty">
+      <div class="e-icon">🔄</div>
+      <h3>데이터 불러오는 중...</h3>
+      <p>잠시만 기다려주세요</p>
+    </div>`;
+
+  // Firebase 실시간 리스너 — 누군가 변경하면 모든 기기에 즉시 반영
+  dbRef.on('value', snapshot => {
+    const data = snapshot.val();
+    if (data && data.items && data.items.length > 0) {
+      state.categories = data.categories || state.categories;
+      state.items = data.items;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } else if (!data) {
+      // 최초 실행: 기본 데이터를 Firebase에 저장
+      dbRef.set({ categories: state.categories, items: state.items });
+    }
+    renderAll();
+  }, err => {
+    // 연결 실패 시 로컬 캐시 사용
+    console.error('Firebase 연결 오류:', err);
+    renderAll();
+    showToast('⚠️ 오프라인 모드로 실행 중');
+  });
+
+  // 연결 상태 표시
+  firebase.database().ref('.info/connected').on('value', snap => {
+    const dot = document.getElementById('connDot');
+    if (dot) dot.style.background = snap.val() ? '#2a7a4f' : '#c0392b';
+  });
 }
 
 function refreshEmojiPicker() {
@@ -1002,7 +1056,7 @@ function addItem() {
   const catId = document.getElementById('newCat').value;
   const priority = document.getElementById('newPri').value;
   const note = document.getElementById('newNote').value.trim();
-  state.items.push({ id: nextId++, catId, text, priority, note, checked: false });
+  state.items.push({ id: Date.now(), catId, text, priority, note, checked: false });
   save();
   document.getElementById('newText').value = '';
   document.getElementById('newNote').value = '';
